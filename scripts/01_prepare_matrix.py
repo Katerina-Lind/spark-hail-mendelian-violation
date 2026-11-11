@@ -75,6 +75,7 @@ def main():
         hl.init(**kw, spark_conf={
     "spark.hadoop.fs.s3.impl":
         "org.apache.hadoop.fs.s3a.S3AFileSystem",
+    "spark.hadoop.fs.s3a.connection.maximum": "128",
     "spark.hadoop.fs.s3a.impl":
         "org.apache.hadoop.fs.s3a.S3AFileSystem",
 })
