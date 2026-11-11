@@ -86,8 +86,37 @@ def main():
         # must have one writer and a deterministic, unique versioned path.
         if hfs.exists(a.matrix) or hfs.exists(a.manifest):
             raise FileExistsError('Partial preparation already exists')
+        # Stage the compressed VCF locally before Hail imports it.
+        # This avoids parallel VCF reads through Hadoop S3A.
+        from urllib.parse import urlparse
+        import boto3
+        from boto3.s3.transfer import TransferConfig
+
+        parsed = urlparse(a.vcf)
+        if parsed.scheme != 's3':
+            raise ValueError('Expected an s3:// input VCF')
+
+        local_vcf = os.path.join(local_dir, 'input.vcf.gz')
+        s3 = boto3.client('s3', region_name='us-east-1')
+        transfer_config = TransferConfig(
+            max_concurrency=4,
+            multipart_chunksize=64 * 1024 * 1024
+        )
+
+        print(f'Downloading {a.vcf} to {local_vcf}', flush=True)
+        s3.download_file(
+            parsed.netloc,
+            parsed.path.lstrip('/'),
+            local_vcf,
+            Config=transfer_config
+        )
+        print(
+            f'Local VCF downloaded: {os.path.getsize(local_vcf):,} bytes',
+            flush=True
+        )
+
         mt = hl.import_vcf(
-            a.vcf, reference_genome='GRCh38', force_bgz=True,
+            local_vcf, reference_genome='GRCh38', force_bgz=True,
             array_elements_required=False,
             find_replace=(PARTIAL_GT_PATTERN, './.'), block_size=128)
         required = {'GT', 'DP', 'AD', 'GQ', 'PL'}
