@@ -249,7 +249,12 @@ def main():
                        'app_name': f'glnexus-mv-{args.chunk_id or "chunk"}'}
         if args.local_cores is not None:
             init_kwargs['local'] = f'local[{args.local_cores}]'
-        hl.init(**init_kwargs)
+        hl.init(**init_kwargs, spark_conf={
+    "spark.hadoop.fs.s3.impl":
+        "org.apache.hadoop.fs.s3a.S3AFileSystem",
+    "spark.hadoop.fs.s3a.impl":
+        "org.apache.hadoop.fs.s3a.S3AFileSystem",
+})
         hail_started = True
         heap_gb = _heap_and_spark_summary()
         print(f'Run ID: {args.run_id}; output prefix: {args.final_prefix}', flush=True)

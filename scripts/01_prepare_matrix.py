@@ -72,7 +72,12 @@ def main():
         kw = {'tmp_dir': shared_dir, 'local_tmpdir': local_dir, 'app_name': 'prepare-glnexus-matrix'}
         if a.local_cores:
             kw['local'] = f'local[{a.local_cores}]'
-        hl.init(**kw)
+        hl.init(**kw, spark_conf={
+    "spark.hadoop.fs.s3.impl":
+        "org.apache.hadoop.fs.s3a.S3AFileSystem",
+    "spark.hadoop.fs.s3a.impl":
+        "org.apache.hadoop.fs.s3a.S3AFileSystem",
+})
         initialised = True
         if validate_existing(a):
             return
