@@ -13,7 +13,7 @@ process PREPARE_MATRIX {
     tag { chunk_id }
     container params.hail_container
     cpus 8
-    memory '32 GB'
+    memory '64 GB'
     errorStrategy 'terminate'
 
     input:
@@ -25,6 +25,7 @@ process PREPARE_MATRIX {
 
     script:
     """
+export PYSPARK_SUBMIT_ARGS='--driver-memory 40g --executor-memory 40g pyspark-shell'
     python ${prep_script} \\
       --vcf '${vcf}' \\
       --matrix '${matrix}' \\
@@ -39,7 +40,7 @@ process MENDELIAN_SCREEN {
     tag { chunk_id }
     container params.hail_container
     cpus 8
-    memory '32 GB'
+    memory '64 GB'
     errorStrategy 'terminate'
 
     input:
@@ -55,6 +56,7 @@ process MENDELIAN_SCREEN {
     def lcr_arg = params.skip_lcr ? '--skip-lcr' : "--lcr-bed '${lcr_bed}'"
     def vcf_arg = params.emit_vcf ? '' : '--no-vcf'
     """
+    export PYSPARK_SUBMIT_ARGS='--driver-memory 40g --executor-memory 40g pyspark-shell'
     python ${analysis_script} \\
       --matrix '${matrix}' \\
       --prep-manifest '${manifest}' \\
@@ -63,7 +65,7 @@ process MENDELIAN_SCREEN {
       --local-cores ${task.cpus} \\
       --tmp-dir '${params.hail_tmp}' \\
       ${lcr_arg} ${vcf_arg}
-    printf '%s\t%s\n' '${chunk_id}' '${params.results}/${chunk_id}.completed.json' > completed_${chunk_id}.txt
+    echo "${chunk_id}\t${params.results}/${chunk_id}.completed.json" > completed_${chunk_id}.txt
     """
 }
 
