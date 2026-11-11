@@ -1,0 +1,9 @@
+.DS_Store
+__pycache__/
+*.pyc
+.nextflow*
+work/
+results/
+*.mt/
+*.ht/
+.env

@@ -1,0 +1,2 @@
+chunk_id	vcf	input_version	matrix	manifest
+chr22_0_2500000	s3a://REPLACE_BUCKET/chr22_0_2500000.vcf.gz	REPLACE_WITH_IMMUTABLE_ID	s3a://REPLACE_BUCKET/hail/v1/chr22_0_2500000.mt	s3a://REPLACE_BUCKET/hail/v1/chr22_0_2500000.prepare.json
