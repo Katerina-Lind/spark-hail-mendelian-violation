@@ -50,7 +50,7 @@ process MENDELIAN_SCREEN {
     path analysis_script
 
     output:
-    path 'completed_${chunk_id}.txt'
+    path 'completed.txt'
 
     script:
     def lcr_arg = params.skip_lcr ? '--skip-lcr' : "--lcr-bed '${lcr_bed}'"
@@ -65,7 +65,7 @@ process MENDELIAN_SCREEN {
       --local-cores ${task.cpus} \\
       --tmp-dir '${params.hail_tmp}' \\
       ${lcr_arg} ${vcf_arg}
-    echo "${chunk_id}\t${params.results}/${chunk_id}.completed.json" > completed_${chunk_id}.txt
+    echo "${chunk_id}\t${params.results}/${chunk_id}.completed.json" > completed.txt
     """
 }
 
