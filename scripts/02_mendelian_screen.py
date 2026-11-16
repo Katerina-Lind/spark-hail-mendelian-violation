@@ -68,7 +68,7 @@ def cli():
     ap.add_argument('--min-qual', type=float, default=150.0)
     ap.add_argument('--max-ac-exclusive', type=int, default=20)
     ap.add_argument('--no-vcf', action='store_true', help='Export primary candidate TSV only; skip large VCF')
-    ap.add_argument('--overwrite', action='store_true', help='Replace existing outputs for this unique chunk prefix')
+    # --overwrite intentionally unsupported: final S3 results are immutable.
     return ap.parse_args()
 
 
@@ -91,6 +91,8 @@ def _append_path(base, name):
 
 def _publish_file(stage_path, final_path):
     """Local rename is atomic; cloud copy is NOT atomic (marker is published last)."""
+    if '/publication/' not in stage_path:
+        raise ValueError(f'Publication source must be inside run staging: {stage_path}')
     stage_local = _local_path(stage_path)
     final_local = _local_path(final_path)
     if stage_local is not None and final_local is not None:
@@ -100,45 +102,40 @@ def _publish_file(stage_path, final_path):
         hfs.remove(stage_path)
 
 
-def _cleanup_stage(stage_paths):
+def _cleanup_stage(stage_paths, shared_run_tmp=None):
     for path in stage_paths:
+        if shared_run_tmp is None or not path.startswith(shared_run_tmp.rstrip('/') + '/'):
+            raise ValueError(f'Refusing to delete staging path outside run tmp: {path}')
         try:
             hfs.remove(path)
         except Exception as exc:
             print(f'WARNING: could not clean staging artifact {path}: {exc}', file=sys.stderr)
 
 
-def _publish_results(staged, manifest_stage, manifest_final, overwrite, obsolete_outputs=()):
-    """Publish data first, then a success marker. Never mark partial outputs as complete.
+def _publish_results(staged, manifest_stage, manifest_final):
+    """Publish immutable outputs; completion marker is the last object.
 
-    For S3, copies are not transactional. Consumers must verify completed.json.
-    Existing outputs with --overwrite may be replaced; use distinct prefixes
-    for concurrently running chunks/retries (Nextflow work dirs are ideal).
+    Staging files MUST reside in the run-specific temporary directory, where
+    deletion is allowed. Never delete, replace, or roll back permanent outputs.
+    S3 copies are non-atomic: a failed copy can leave an incomplete final
+    object. In that case retry with a NEW final prefix, not --overwrite.
     """
-    targets = [final for _, final in staged] + list(obsolete_outputs) + [manifest_final]
+    targets = [final for _, final in staged] + [manifest_final]
     existing = [path for path in targets if hfs.exists(path)]
-    if existing and not overwrite:
-        raise FileExistsError(f'Existing output(s): {existing}; use unique --out-prefix or --overwrite')
-    try:
-        # Invalidate any old success marker before modifying output files.
-        if hfs.exists(manifest_final):
-            hfs.remove(manifest_final)
-        for obsolete in obsolete_outputs:
-            hfs.remove(obsolete)
-        for stage, final in staged:
-            _publish_file(stage, final)
-        # This marker is the last file, after every export and metadata check.
-        _publish_file(manifest_stage, manifest_final)
-    except Exception:
-        # Prevent partly published data from being mistaken for successful work.
-        # On object storage, a failed copy may have left an incomplete object.
-        for path in targets:
-            try:
-                hfs.remove(path)
-            except Exception as exc:
-                print(f'WARNING: unable to clean incomplete output {path}: {exc}', file=sys.stderr)
-        raise
-
+    if existing:
+        raise FileExistsError(
+            f'Existing permanent output(s): {existing}; use a new --out-prefix. '
+            'This role never overwrites or deletes final outputs.'
+        )
+    for stage, final in staged:
+        # Recheck immediately before publishing (not an atomic S3 condition).
+        if hfs.exists(final):
+            raise FileExistsError(f'Permanent output appeared during publishing: {final}')
+        _publish_file(stage, final)
+    # Readers must accept a run only when this completion marker exists.
+    if hfs.exists(manifest_final):
+        raise FileExistsError(f'Completion marker already exists: {manifest_final}')
+    _publish_file(manifest_stage, manifest_final)
 
 def _heap_and_spark_summary():
     sc = hl.spark_context()
@@ -164,13 +161,9 @@ def _prepare_run(args):
 
     args.final_prefix = args.out_prefix + ('.' + chunk_id if chunk_id else '')
     args.run_id = uuid.uuid4().hex
-    args.stage_prefix = args.final_prefix + '.__stage_' + args.run_id
     args.final_tsv = args.final_prefix + '.candidate_trios.tsv.bgz'
     args.final_vcf = args.final_prefix + '.candidate_sites.vcf.bgz'
     args.final_manifest = args.final_prefix + '.completed.json'
-    args.stage_tsv = args.stage_prefix + '.candidate_trios.tsv.bgz'
-    args.stage_vcf = args.stage_prefix + '.candidate_sites.vcf.bgz'
-    args.stage_manifest = args.stage_prefix + '.completed.json'
 
     root = args.local_tmpdir or os.environ.get('TMPDIR') or '/tmp'
     if _local_path(root) is None:
@@ -180,20 +173,27 @@ def _prepare_run(args):
     args.shared_run_tmp = _append_path(args.tmp_dir, 'dnv-' + args.run_id) if args.tmp_dir else args.local_run_tmp
     if args.shared_run_tmp != args.local_run_tmp:
         hfs.mkdir(args.shared_run_tmp)
-    args.checkpoint_run_dir = (_append_path(args.checkpoint_dir, 'dnv-' + args.run_id)
-                               if args.checkpoint_dir else _append_path(args.shared_run_tmp, 'checkpoints'))
+    # Staging is *only* under tmp/, never alongside immutable final outputs.
+    args.stage_prefix = _append_path(args.shared_run_tmp, 'publication/' + args.run_id)
+    args.stage_tsv = args.stage_prefix + '.candidate_trios.tsv.bgz'
+    args.stage_vcf = args.stage_prefix + '.candidate_sites.vcf.bgz'
+    args.stage_manifest = args.stage_prefix + '.completed.json'
+    if args.checkpoint_dir:
+        raise ValueError('--checkpoint-dir is disabled for immutable-output runs; use --tmp-dir')
+    args.checkpoint_run_dir = _append_path(args.shared_run_tmp, 'checkpoints')
     if args.checkpoint_run_dir != args.shared_run_tmp:
         hfs.mkdir(args.checkpoint_run_dir)
     out_dir = os.path.dirname(args.final_prefix) or '.'
     if not hfs.exists(out_dir):
         hfs.mkdir(out_dir)
 
-    # Check before ingesting a large VCF, not after expensive Hail calculations.
-    # Even with --no-vcf, reject/reconcile a stale VCF left by a previous run.
+    # Reject collisions before starting expensive Hail computation.
     target_files = [args.final_tsv, args.final_manifest, args.final_vcf]
     existing = [p for p in target_files if hfs.exists(p)]
-    if existing and not args.overwrite:
-        raise FileExistsError(f'Output already exists: {existing}; use unique --out-prefix or --overwrite')
+    if existing:
+        raise FileExistsError(
+            f'Protected output already exists: {existing}; use a NEW --out-prefix'
+        )
     return target_files
 
 
@@ -264,7 +264,7 @@ def main():
         print(f'Checkpoint dir: {args.checkpoint_run_dir}', flush=True)
         _process_chunk(args, heap_gb)
     finally:
-        _cleanup_stage(stage_paths)
+        _cleanup_stage(stage_paths, getattr(args, 'shared_run_tmp', None))
         if hail_started:
             hl.stop()
         if 'args' in locals() and hasattr(args, 'local_run_tmp') and not args.keep_tmp:
@@ -541,8 +541,7 @@ def _process_chunk(args, heap_gb):
     with hfs.open(args.stage_manifest, 'w') as handle:
         json.dump(manifest, handle, indent=2, sort_keys=True)
         handle.write('\n')
-    _publish_results(artifacts, args.stage_manifest, args.final_manifest, args.overwrite,
-                     obsolete_outputs=[args.final_vcf] if args.no_vcf else ())
+    _publish_results(artifacts, args.stage_manifest, args.final_manifest)
     print(f'Published primary TSV: {args.final_tsv}', flush=True)
     if not args.no_vcf:
         print(f'Published validation VCF: {args.final_vcf}', flush=True)
