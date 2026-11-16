@@ -274,12 +274,6 @@ def main():
                     hfs.rmtree(args.shared_run_tmp)
                 except Exception as exc:
                     print(f'WARNING: failed to remove run scratch {args.shared_run_tmp}: {exc}', file=sys.stderr)
-            if (args.checkpoint_dir and hasattr(args, 'checkpoint_run_dir')
-                    and not args.checkpoint_run_dir.startswith(args.shared_run_tmp + '/')):
-                try:
-                    hfs.rmtree(args.checkpoint_run_dir)
-                except Exception as exc:
-                    print(f'WARNING: failed to remove checkpoints {args.checkpoint_run_dir}: {exc}', file=sys.stderr)
 
 
 def _process_chunk(args, heap_gb):
