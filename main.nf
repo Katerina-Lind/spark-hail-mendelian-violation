@@ -25,7 +25,9 @@ process PREPARE_MATRIX {
 
     script:
     """
-export PYSPARK_SUBMIT_ARGS='--driver-memory 40g --executor-memory 40g pyspark-shell'
+export TMPDIR=/tmp
+    export SPARK_LOCAL_DIRS=/tmp
+    export PYSPARK_SUBMIT_ARGS='--driver-memory 40g --executor-memory 40g pyspark-shell'
     python ${prep_script} \\
       --vcf '${vcf}' \\
       --matrix '${matrix}' \\
@@ -33,6 +35,13 @@ export PYSPARK_SUBMIT_ARGS='--driver-memory 40g --executor-memory 40g pyspark-sh
       --input-version '${input_version}' \\
       --local-cores ${task.cpus} \\
       --tmp-dir '${params.hail_tmp}'
+    """
+
+    stub:
+    """
+    echo "STUB PREPARE_MATRIX: ${chunk_id}"
+    echo "Input VCF: ${vcf}"
+    echo "Matrix destination: ${matrix}"
     """
 }
 
@@ -56,6 +65,8 @@ process MENDELIAN_SCREEN {
     def lcr_arg = params.skip_lcr ? '--skip-lcr' : "--lcr-bed '${lcr_bed}'"
     def vcf_arg = params.emit_vcf ? '' : '--no-vcf'
     """
+    export TMPDIR=/tmp
+    export SPARK_LOCAL_DIRS=/tmp
     export PYSPARK_SUBMIT_ARGS='--driver-memory 40g --executor-memory 40g pyspark-shell'
     python ${analysis_script} \\
       --matrix '${matrix}' \\
@@ -67,10 +78,16 @@ process MENDELIAN_SCREEN {
       ${lcr_arg} ${vcf_arg}
     echo "${chunk_id}\t${params.results}/${chunk_id}.completed.json" > completed.txt
     """
+
+    stub:
+    """
+    echo "STUB MENDELIAN_SCREEN: ${chunk_id}"
+    printf '%s\\t%s\\n' '${chunk_id}' '${params.results}/${chunk_id}.completed.json' > completed.txt
+    """
 }
 
 workflow {
-    for (p in ['chunks', 'pedigree', 'results', 'hail_tmp', 'hail_container']) {
+    ['chunks', 'pedigree', 'results', 'hail_tmp', 'hail_container'].each { p ->
         if (!params[p]) error "Missing --${p.replace('_','-')}"
     }
     if (!params.skip_lcr && !params.lcr_bed) error 'Supply --lcr_bed or --skip_lcr true'
