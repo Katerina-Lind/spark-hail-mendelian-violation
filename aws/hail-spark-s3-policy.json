@@ -1,0 +1,62 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListHailProject",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::ucsf-spark",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/*",
+            "01-sfari/analysis/trio-wgs/hail-mendelian/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ReadHailInputs",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": [
+        "arn:aws:s3:::ucsf-spark/01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/*",
+        "arn:aws:s3:::ucsf-spark/01-sfari/analysis/trio-wgs/hail-mendelian/metadata/*"
+      ]
+    },
+    {
+      "Sid": "ReadWriteMatrices",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::ucsf-spark/01-sfari/analysis/trio-wgs/hail-mendelian/matrices/v1/*"
+    },
+    {
+      "Sid": "ReadWriteResults",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::ucsf-spark/01-sfari/analysis/trio-wgs/hail-mendelian/results/chr22_nvme_v1/*"
+    },
+    {
+      "Sid": "ManageTemporaryHailFiles",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::ucsf-spark/01-sfari/analysis/trio-wgs/hail-mendelian/tmp/*"
+    },
+    {
+      "Sid": "GetHailBucketLocation",
+      "Effect": "Allow",
+      "Action": "s3:GetBucketLocation",
+      "Resource": "arn:aws:s3:::ucsf-spark"
+    }
+  ]
+}
