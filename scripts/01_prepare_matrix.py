@@ -7,6 +7,9 @@ logic. Do NOT change an existing version in place. Supply an immutable input ID
 for each distinct input/preprocessing version.
 """
 import argparse
+import hashlib
+import boto3
+from urllib.parse import urlparse
 from datetime import datetime, timezone
 import json
 import os
@@ -56,6 +59,36 @@ def validate_existing(a):
     return True
 
 
+
+def verify_source_metadata(s3, vcf, input_version):
+    parsed = urlparse(vcf)
+    if parsed.scheme != 's3' or not parsed.netloc:
+        raise ValueError('Expected an s3:// input VCF')
+
+    key = parsed.path.lstrip('/')
+    head = s3.head_object(Bucket=parsed.netloc, Key=key)
+
+    metadata = {
+        'bucket': parsed.netloc,
+        'key': key,
+        'etag': head['ETag'].strip('"'),
+        'size': head['ContentLength'],
+        'last_modified': head['LastModified'].isoformat(),
+    }
+
+    fingerprint = hashlib.sha256(
+        json.dumps(metadata, sort_keys=True).encode()
+    ).hexdigest()[:16]
+
+    if fingerprint != input_version:
+        raise RuntimeError(
+            f'S3 input metadata mismatch: {vcf}; '
+            f'expected={input_version}, observed={fingerprint}'
+        )
+
+    return metadata
+
+
 def main():
     a = arguments()
     if a.matrix.rstrip('/') == a.manifest.rstrip('/'):
@@ -80,40 +113,64 @@ def main():
         "org.apache.hadoop.fs.s3a.S3AFileSystem",
 })
         initialised = True
+        s3 = boto3.client('s3', region_name='us-east-1')
+        source = verify_source_metadata(s3, a.vcf, a.input_version)
+        print(f'Input metadata verified: {a.input_version}', flush=True)
         if validate_existing(a):
             return
         # Refuse even a partial previous output; in multi-worker runs each chunk
         # must have one writer and a deterministic, unique versioned path.
         if hfs.exists(a.matrix) or hfs.exists(a.manifest):
             raise FileExistsError('Partial preparation already exists')
-        # Stage the compressed VCF locally before Hail imports it.
-        # This avoids parallel VCF reads through Hadoop S3A.
-        from urllib.parse import urlparse
-        import boto3
-        from boto3.s3.transfer import TransferConfig
-
-        parsed = urlparse(a.vcf)
-        if parsed.scheme != 's3':
-            raise ValueError('Expected an s3:// input VCF')
-
+        # Stage the VCF locally, verifying its identity during transfer.
         local_vcf = os.path.join(local_dir, 'input.vcf.gz')
-        s3 = boto3.client('s3', region_name='us-east-1')
-        transfer_config = TransferConfig(
-            max_concurrency=4,
-            multipart_chunksize=64 * 1024 * 1024
+
+        print(f'Conditionally downloading {a.vcf}', flush=True)
+        response = s3.get_object(
+            Bucket=source['bucket'],
+            Key=source['key'],
+            IfMatch='"' + source['etag'] + '"'
         )
 
-        print(f'Downloading {a.vcf} to {local_vcf}', flush=True)
-        s3.download_file(
-            parsed.netloc,
-            parsed.path.lstrip('/'),
-            local_vcf,
-            Config=transfer_config
+        body = response['Body']
+        digest = hashlib.sha256()
+        downloaded = 0
+
+        try:
+            if (
+                response['ETag'].strip('"') != source['etag']
+                or response['ContentLength'] != source['size']
+                or response['LastModified'].isoformat()
+                   != source['last_modified']
+            ):
+                raise RuntimeError('S3 GET response metadata mismatch')
+
+            with open(local_vcf, 'xb') as output:
+                for block in body.iter_chunks(chunk_size=8 * 1024 * 1024):
+                    if block:
+                        output.write(block)
+                        digest.update(block)
+                        downloaded += len(block)
+        finally:
+            body.close()
+
+        if downloaded != source['size']:
+            raise RuntimeError(
+                f'Download size mismatch: {downloaded} '
+                f'!= {source["size"]}'
+            )
+
+        # Detect any change to the current object during transfer.
+        after = verify_source_metadata(
+            s3, a.vcf, a.input_version
         )
-        print(
-            f'Local VCF downloaded: {os.path.getsize(local_vcf):,} bytes',
-            flush=True
-        )
+        if after != source:
+            raise RuntimeError('S3 source changed during download')
+
+        input_sha256 = digest.hexdigest()
+
+        print(f'Local VCF downloaded: {downloaded:,} bytes', flush=True)
+        print(f'Input VCF SHA256: {input_sha256}', flush=True)
 
         mt = hl.import_vcf(
             local_vcf, reference_genome='GRCh38', force_bgz=True,
@@ -143,6 +200,11 @@ def main():
             json.dump({
                 'status': 'complete', 'schema_version': PREP_SCHEMA_VERSION,
                 'input_vcf': a.vcf, 'input_version': a.input_version,
+                'input_fingerprint_type': 's3_metadata_sha256_16',
+                'input_sha256': input_sha256,
+                'input_s3_etag': source['etag'],
+                'input_size_bytes': source['size'],
+                'input_last_modified': source['last_modified'],
                 'matrix': a.matrix, 'reference_genome': 'GRCh38',
                 'import_records': input_records, 'input_samples': cols,
                 'hail_version': hl.__version__,
