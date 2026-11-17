@@ -1,0 +1,181 @@
+{
+  "fingerprint_note": "Metadata fingerprints identify observed S3 object states; they are not content checksums or immutable version IDs.",
+  "excluded_zero_variant_chunks": [
+    "chr22_1_2500000",
+    "chr22_2500001_5000000",
+    "chr22_5000001_7500000",
+    "chr22_7500001_10000000"
+  ],
+  "inputs": [
+    {
+      "chunk_id": "chr22_10000001_12500000",
+      "input_version": "16cd51d56619f4c0",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_10000001_12500000.trio_samples.nonref.vcf.gz",
+      "etag": "18e8832f4af4b8b1580ca523ac94cd3c-2442",
+      "size": 20483999238,
+      "last_modified": "2026-10-08T17:50:04+00:00"
+    },
+    {
+      "chunk_id": "chr22_12500001_15000000",
+      "input_version": "a573c0137eec7232",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_12500001_15000000.trio_samples.nonref.vcf.gz",
+      "etag": "45c28008b9c6aa079e70d19707b7e6b0-515",
+      "size": 4315017579,
+      "last_modified": "2026-10-08T18:31:00+00:00"
+    },
+    {
+      "chunk_id": "chr22_15000001_17500000",
+      "input_version": "7b0618aeeef8d694",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_15000001_17500000.trio_samples.nonref.vcf.gz",
+      "etag": "64adaf4f7cd2c1a17f7ca885f8d2063a-2381",
+      "size": 19970287297,
+      "last_modified": "2026-10-08T22:25:14+00:00"
+    },
+    {
+      "chunk_id": "chr22_17500001_20000000",
+      "input_version": "26574651d45ce519",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_17500001_20000000.trio_samples.nonref.vcf.gz",
+      "etag": "b5934b6c9aad2e110f7e357f2adc8eae-1692",
+      "size": 14187961720,
+      "last_modified": "2026-10-09T01:04:50+00:00"
+    },
+    {
+      "chunk_id": "chr22_20000001_22500000",
+      "input_version": "4c6cce3c1938857b",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_20000001_22500000.trio_samples.nonref.vcf.gz",
+      "etag": "429a390e46831e5a26c16e30fb19fb6c-1931",
+      "size": 16195434710,
+      "last_modified": "2026-10-09T19:36:46+00:00"
+    },
+    {
+      "chunk_id": "chr22_22500001_25000000",
+      "input_version": "d78d60d571ceb66f",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_22500001_25000000.trio_samples.nonref.vcf.gz",
+      "etag": "1f1af2e3bd7bad050e85c1cece00403c-1545",
+      "size": 12955405360,
+      "last_modified": "2026-10-09T22:29:41+00:00"
+    },
+    {
+      "chunk_id": "chr22_25000001_27500000",
+      "input_version": "57c4fb06758ca54c",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_25000001_27500000.trio_samples.nonref.vcf.gz",
+      "etag": "eb5193dd11d616736f5b31583c3a981c-1920",
+      "size": 16105809544,
+      "last_modified": "2026-10-10T02:00:10+00:00"
+    },
+    {
+      "chunk_id": "chr22_27500001_30000000",
+      "input_version": "a705d534fdee2489",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_27500001_30000000.trio_samples.nonref.vcf.gz",
+      "etag": "1b5d38c833db2d9f101a19f0080fbed1-1861",
+      "size": 15606108100,
+      "last_modified": "2026-10-10T05:23:47+00:00"
+    },
+    {
+      "chunk_id": "chr22_30000001_32500000",
+      "input_version": "e791d084c61dec2e",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_30000001_32500000.trio_samples.nonref.vcf.gz",
+      "etag": "a1639e3092e47cc192363b1257cc8cb0-1907",
+      "size": 15991355327,
+      "last_modified": "2026-10-10T08:49:58+00:00"
+    },
+    {
+      "chunk_id": "chr22_32500001_35000000",
+      "input_version": "d7631a5b429e5189",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_32500001_35000000.trio_samples.nonref.vcf.gz",
+      "etag": "a4b4b512f033318e3954eab80631cb74-1856",
+      "size": 15561947774,
+      "last_modified": "2026-10-10T13:48:21+00:00"
+    },
+    {
+      "chunk_id": "chr22_35000001_37500000",
+      "input_version": "3672ec2af584092c",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_35000001_37500000.trio_samples.nonref.vcf.gz",
+      "etag": "6021a13f427085725dfb987fbfbdf5f6-1703",
+      "size": 14278739667,
+      "last_modified": "2026-10-10T17:32:14+00:00"
+    },
+    {
+      "chunk_id": "chr22_37500001_40000000",
+      "input_version": "e7b32c43feba77e7",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_37500001_40000000.trio_samples.nonref.vcf.gz",
+      "etag": "49189c037f80732442a51a9d1c9918af-1944",
+      "size": 16306120627,
+      "last_modified": "2026-10-10T21:34:42+00:00"
+    },
+    {
+      "chunk_id": "chr22_40000001_42500000",
+      "input_version": "849af78377c23129",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_40000001_42500000.trio_samples.nonref.vcf.gz",
+      "etag": "b42dd516b27778fbd2ccf90485270f2a-1847",
+      "size": 15491163399,
+      "last_modified": "2026-10-11T00:58:31+00:00"
+    },
+    {
+      "chunk_id": "chr22_42500001_45000000",
+      "input_version": "c15520ccb4fc3917",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_42500001_45000000.trio_samples.nonref.vcf.gz",
+      "etag": "da41b94cfd3937428f4d2b172077808e-2179",
+      "size": 18273686652,
+      "last_modified": "2026-10-11T04:19:31+00:00"
+    },
+    {
+      "chunk_id": "chr22_45000001_47500000",
+      "input_version": "59b7e597c5516e56",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_45000001_47500000.trio_samples.nonref.vcf.gz",
+      "etag": "439d7a61445a21cb1c8b9a3bbe7f5884-2139",
+      "size": 17937251594,
+      "last_modified": "2026-10-11T07:39:16+00:00"
+    },
+    {
+      "chunk_id": "chr22_47500001_50000000",
+      "input_version": "c56930c2ed151e6d",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_47500001_50000000.trio_samples.nonref.vcf.gz",
+      "etag": "6843dc35c08cba230a3860dba79c20d9-2256",
+      "size": 18916463843,
+      "last_modified": "2026-10-11T11:07:26+00:00"
+    },
+    {
+      "chunk_id": "chr22_50000001_50818468",
+      "input_version": "f34a20c488ca2236",
+      "fingerprint_type": "s3_metadata_sha256_16",
+      "bucket": "ucsf-spark",
+      "key": "01-sfari/analysis/trio-wgs/pvcf-reduction/chr22/SPARK.WGS.2026_08.gatk.chr22_50000001_50818468.trio_samples.nonref.vcf.gz",
+      "etag": "349f5409ed6fb62756582b1319872b2e-840",
+      "size": 7039880637,
+      "last_modified": "2026-10-08T12:49:42+00:00"
+    }
+  ]
+}
