@@ -89,6 +89,24 @@ def _append_path(base, name):
     return base.rstrip('/') + '/' + name
 
 
+
+def _validate_run_tmp(path):
+    """Permit S3 recursive cleanup only in our dedicated Hail scratch area."""
+    import re
+
+    allowed = (
+        r's3://ucsf-spark/01-sfari/analysis/trio-wgs/'
+        r'hail-mendelian/tmp/dnv-[0-9a-f]{32}'
+    )
+
+    if re.fullmatch(allowed, path) is None:
+        raise ValueError(
+            f'Unsafe Hail temporary directory; refusing operation: {path}'
+        )
+
+    return path
+
+
 def _publish_file(stage_path, final_path):
     """Local rename is atomic; cloud copy is NOT atomic (marker is published last)."""
     if '/publication/' not in stage_path:
@@ -172,6 +190,7 @@ def _prepare_run(args):
     os.makedirs(args.local_run_tmp, exist_ok=False)
     args.shared_run_tmp = _append_path(args.tmp_dir, 'dnv-' + args.run_id) if args.tmp_dir else args.local_run_tmp
     if args.shared_run_tmp != args.local_run_tmp:
+        _validate_run_tmp(args.shared_run_tmp)
         hfs.mkdir(args.shared_run_tmp)
     # Staging is *only* under tmp/, never alongside immutable final outputs.
     args.stage_prefix = _append_path(args.shared_run_tmp, 'publication/' + args.run_id)
@@ -271,6 +290,7 @@ def main():
             shutil.rmtree(args.local_run_tmp, ignore_errors=True)
             if getattr(args, 'shared_run_tmp', args.local_run_tmp) != args.local_run_tmp:
                 try:
+                    _validate_run_tmp(args.shared_run_tmp)
                     hfs.rmtree(args.shared_run_tmp)
                 except Exception as exc:
                     print(f'WARNING: failed to remove run scratch {args.shared_run_tmp}: {exc}', file=sys.stderr)
