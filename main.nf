@@ -25,7 +25,7 @@ process PREPARE_MATRIX {
 
     script:
     """
-export TMPDIR=/tmp
+    export TMPDIR=/tmp
     export SPARK_LOCAL_DIRS=/tmp
     export PYSPARK_SUBMIT_ARGS='--driver-memory 40g --executor-memory 40g pyspark-shell'
     python ${prep_script} \\
