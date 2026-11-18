@@ -108,7 +108,7 @@ def main():
         ht = ht.checkpoint(shared_tmp + '/native-calls.ht', overwrite=False)
         by_confidence = ht.aggregate(hl.agg.counter(ht.confidence))
         events = sum(by_confidence.values())
-        sites = ht.aggregate(hl.agg.count_distinct(hl.tuple([ht.locus, ht.alleles])))
+        sites = ht.key_by('locus', 'alleles').distinct().count()
         out = ht.annotate(contig=ht.locus.contig, pos=ht.locus.position,
                           ref=ht.alleles[0], alt=ht.alleles[1])
         out = out.key_by().drop('locus', 'alleles')
