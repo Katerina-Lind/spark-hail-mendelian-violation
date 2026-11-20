@@ -4,6 +4,7 @@
 Intended for Hail 0.2.138 and AWS Batch. Does not modify source MatrixTables.
 """
 import argparse
+import gzip
 import json
 import os
 import shutil
@@ -42,8 +43,30 @@ def main():
         raise ValueError('Invalid MAF')
     output = a.out_prefix + '.kinship_markers.tsv.bgz'
     marker = a.out_prefix + '.kinship_markers.completed.json'
-    if hfs.exists(output) or hfs.exists(marker):
-        raise FileExistsError('Immutable output exists: ' + a.out_prefix)
+    output_exists, marker_exists = hfs.exists(output), hfs.exists(marker)
+    if marker_exists and output_exists:
+        with hfs.open(marker) as f:
+            prior = json.load(f)
+        if (prior.get('status') == 'complete' and
+                prior.get('chunk_id') == a.chunk_id and
+                prior.get('chromosome') == a.chromosome and
+                prior.get('matrix') == a.matrix and
+                prior.get('samples') == samples and
+                prior.get('output') == output and
+                prior.get('filters') == {
+                    'min_dp': 10, 'min_gq': 20,
+                    'min_call_rate': a.min_call_rate,
+                    'min_maf': a.min_maf,
+                    'position_modulus': a.window_modulus,
+                    'position_window_width': a.window_width,
+                    'ld_r2': a.ld_r2,
+                    'ld_pruning_window_bp': 500000,
+                }):
+            print(f'REUSE COMPLETED: {a.chunk_id}', flush=True)
+            return
+        raise ValueError('Existing completed output has different provenance or filters: ' + a.out_prefix)
+    if marker_exists or output_exists:
+        raise FileExistsError('Partial immutable output exists; inspect before retry: ' + a.out_prefix)
     with hfs.open(a.prep_manifest) as f:
         prep = json.load(f)
     if prep.get('status') != 'complete' or prep.get('matrix') != a.matrix:
@@ -76,33 +99,57 @@ def main():
             hl.is_defined(mt.DP) & (mt.DP >= 10) &
             hl.is_defined(mt.GQ) & (mt.GQ >= 20)
         )
-        mt = hl.variant_qc(mt)
-        mt = mt.filter_rows(
-            (mt.variant_qc.call_rate >= a.min_call_rate) &
-            (mt.variant_qc.AF[1] >= a.min_maf) &
-            (mt.variant_qc.AF[1] <= 1 - a.min_maf)
-        )
-        # LD pruning uses all cohort samples. Pruning is independent per chunk:
-        # a small residual LD risk exists across chunk boundaries.
-        pruned = hl.ld_prune(mt.GT, r2=a.ld_r2, bp_window_size=500000)
-        mt = mt.filter_rows(hl.is_defined(pruned[mt.row_key]))
+        # An empty chunk is valid: Hail LD pruning cannot build a zero-row BlockMatrix.
+        # Export the same header-only BGZF-compatible gzip table used by the summariser.
+        # The final manifest is written only after the output is present.
+        n_after_thinning = mt.count_rows()
+        n_after_qc = 0
+        n_after_prune = 0
+        if n_after_thinning:
+            mt = hl.variant_qc(mt)
+            mt = mt.filter_rows(
+                (mt.variant_qc.call_rate >= a.min_call_rate) &
+                (mt.variant_qc.AF[1] >= a.min_maf) &
+                (mt.variant_qc.AF[1] <= 1 - a.min_maf)
+            )
+            n_after_qc = mt.count_rows()
+        if n_after_qc:
+            # LD pruning uses all cohort samples. Pruning is independent per chunk.
+            pruned = hl.ld_prune(mt.GT, r2=a.ld_r2, bp_window_size=500000)
+            mt = mt.filter_rows(hl.is_defined(pruned[mt.row_key]))
+            n_after_prune = mt.count_rows()
+
         mt = mt.filter_cols(hl.literal(set(samples)).contains(mt.s))
         found = set(mt.aggregate_cols(hl.agg.collect(mt.s)))
         if found != set(samples):
             raise ValueError('Missing sample IDs: ' + repr(sorted(set(samples) - found)))
-        ht = mt.entries()
-        ht = ht.filter(hl.is_defined(ht.GT))
-        ht = ht.select(
-            chromosome=ht.locus.contig,
-            pos=ht.locus.position,
-            ref=ht.alleles[0],
-            alt=ht.alleles[1],
-            sample_id=ht.s,
-            dosage=ht.GT.n_alt_alleles(),
-        )
-        ht = ht.key_by()
-        ht = ht.select('chromosome', 'pos', 'ref', 'alt', 'sample_id', 'dosage')
-        ht.export(output)
+
+        if n_after_prune:
+            ht = mt.entries()
+            ht = ht.filter(hl.is_defined(ht.GT))
+            ht = ht.select(
+                chromosome=ht.locus.contig,
+                pos=ht.locus.position,
+                ref=ht.alleles[0],
+                alt=ht.alleles[1],
+                sample_id=ht.s,
+                dosage=ht.GT.n_alt_alleles(),
+            )
+            ht = ht.key_by()
+            ht = ht.select('chromosome', 'pos', 'ref', 'alt', 'sample_id', 'dosage')
+            ht.export(output)
+        else:
+            # No valid SNPs in this chunk. This is an expected data condition.
+            # Python gzip creates a valid stream readable by the summariser.
+            out_bucket, out_key = s3parts(output)
+            header = b'chromosome\tpos\tref\talt\tsample_id\tdosage\n'
+            boto3.client('s3', region_name='us-east-1').put_object(
+                Bucket=out_bucket, Key=out_key,
+                Body=gzip.compress(header), ContentType='application/gzip',
+                IfNoneMatch='*'
+            )
+            print(f'EMPTY MARKER CHUNK: {a.chunk_id} '
+                  f'(thinned={n_after_thinning}, qc={n_after_qc})', flush=True)
         bucket, key = s3parts(marker)
         boto3.client('s3', region_name='us-east-1').put_object(
             Bucket=bucket, Key=key, ContentType='application/json',
@@ -110,6 +157,9 @@ def main():
                 'status': 'complete', 'chunk_id': a.chunk_id,
                 'chromosome': a.chromosome, 'matrix': a.matrix,
                 'samples': samples, 'output': output,
+                'markers_after_thinning': n_after_thinning,
+                'markers_after_qc': n_after_qc,
+                'markers_after_ld_pruning': n_after_prune,
                 'filters': {'min_dp': 10, 'min_gq': 20,
                             'min_call_rate': a.min_call_rate,
                             'min_maf': a.min_maf,
